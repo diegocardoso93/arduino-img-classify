@@ -98,7 +98,7 @@ void loop()
 
   /* Default image name */
   char strFileName[8] = {'0','0','1','.','b','m','p','\0'};
-	/* the thirst char is raffled */
+  /* the third char is raffled */
 
   /* Convert to ASCII char */
   strFileName[2] = randNum+48;
@@ -108,70 +108,68 @@ void loop()
 
   imgFile = SD.open(strFileName);
 
-  if (imgFile) {
-    if (imgFile.available()) {
-      /* Capture bitmap headers */
-      bmpHeader.type = imgFile.read() | (imgFile.read() << 8);
-      bmpHeader.size = imgFile.read() | (imgFile.read() << 8) | (imgFile.read() << 16) | (imgFile.read() << 24);
-      bmpHeader.reserved1 = imgFile.read() | (imgFile.read() << 8);
-      bmpHeader.reserved2 = imgFile.read() | (imgFile.read() << 8);
-      bmpHeader.offset = imgFile.read() | (imgFile.read() << 8) | (imgFile.read() << 16) | (imgFile.read() << 24);
-      bmpInfoHeader.size = imgFile.read() | (imgFile.read() << 8) | (imgFile.read() << 16) | (imgFile.read() << 24);
-      bmpInfoHeader.width = imgFile.read() | (imgFile.read() << 8) | (imgFile.read() << 16) | (imgFile.read() << 24);
-      bmpInfoHeader.height = imgFile.read() | (imgFile.read() << 8) | (imgFile.read() << 16) | (imgFile.read() << 24);
-      bmpInfoHeader.planes = imgFile.read() | (imgFile.read() << 8);
-      bmpInfoHeader.bits = imgFile.read() | (imgFile.read() << 8);
-      bmpInfoHeader.compression = imgFile.read() | (imgFile.read() << 8) | (imgFile.read() << 16) | (imgFile.read() << 24);
-      bmpInfoHeader.image_size = imgFile.read() | (imgFile.read() << 8) | (imgFile.read() << 16) | (imgFile.read() << 24);
-      bmpInfoHeader.x_res = imgFile.read() | (imgFile.read() << 8) | (imgFile.read() << 16) | (imgFile.read() << 24);
-      bmpInfoHeader.y_res = imgFile.read() | (imgFile.read() << 8) | (imgFile.read() << 16) | (imgFile.read() << 24);
-      bmpInfoHeader.colors = imgFile.read() | (imgFile.read() << 8) | (imgFile.read() << 16) | (imgFile.read() << 24);
-      bmpInfoHeader.imp_colors = imgFile.read() | (imgFile.read() << 8) | (imgFile.read() << 16) | (imgFile.read() << 24);
+  if (imgFile && imgFile.available()) {
+    /* Capture bitmap headers */
+    bmpHeader.type = imgFile.read() | (imgFile.read() << 8);
+    bmpHeader.size = imgFile.read() | (imgFile.read() << 8) | (imgFile.read() << 16) | (imgFile.read() << 24);
+    bmpHeader.reserved1 = imgFile.read() | (imgFile.read() << 8);
+    bmpHeader.reserved2 = imgFile.read() | (imgFile.read() << 8);
+    bmpHeader.offset = imgFile.read() | (imgFile.read() << 8) | (imgFile.read() << 16) | (imgFile.read() << 24);
+    bmpInfoHeader.size = imgFile.read() | (imgFile.read() << 8) | (imgFile.read() << 16) | (imgFile.read() << 24);
+    bmpInfoHeader.width = imgFile.read() | (imgFile.read() << 8) | (imgFile.read() << 16) | (imgFile.read() << 24);
+    bmpInfoHeader.height = imgFile.read() | (imgFile.read() << 8) | (imgFile.read() << 16) | (imgFile.read() << 24);
+    bmpInfoHeader.planes = imgFile.read() | (imgFile.read() << 8);
+    bmpInfoHeader.bits = imgFile.read() | (imgFile.read() << 8);
+    bmpInfoHeader.compression = imgFile.read() | (imgFile.read() << 8) | (imgFile.read() << 16) | (imgFile.read() << 24);
+    bmpInfoHeader.image_size = imgFile.read() | (imgFile.read() << 8) | (imgFile.read() << 16) | (imgFile.read() << 24);
+    bmpInfoHeader.x_res = imgFile.read() | (imgFile.read() << 8) | (imgFile.read() << 16) | (imgFile.read() << 24);
+    bmpInfoHeader.y_res = imgFile.read() | (imgFile.read() << 8) | (imgFile.read() << 16) | (imgFile.read() << 24);
+    bmpInfoHeader.colors = imgFile.read() | (imgFile.read() << 8) | (imgFile.read() << 16) | (imgFile.read() << 24);
+    bmpInfoHeader.imp_colors = imgFile.read() | (imgFile.read() << 8) | (imgFile.read() << 16) | (imgFile.read() << 24);
 
-	    /* Passes through the image pixels and reads the RGB */
-      for (i=76799; i >= 0 ; i--) {
-          r = imgFile.read();
-          g = imgFile.read();
-          b = imgFile.read();
-          x = ((r >> 3 ) << 11) | ((g >> 2 ) << 5) | (b >> 3 ); /* RGB 565 format */
-          img[i] = ((r >> 5 ) << 5) | ((g >> 5 ) << 2) | (b >> 6 );
-          GLCD.setColor(x); 
-          GLCD.drawPixel(i%320, i/320);
-      }
-
-      /* Window to shrink analysis region */
-      for (i = FIMy*320; i >= INIy*320; i--) {
-          GLCD.setColor(((img[i] >> 3 ) << 11) | ((img[i] >> 2 ) << 5) | (img[i] >> 3 )); /* threshold/grayscale */
-          GLCD.drawPixel(i%320, i/320);
-      }
-
-      /* Print the border indicating analysis region */
-      GLCD.setColor(255, 255, 0);
-      GLCD.drawRoundRect(20, 140, 300, 220);
-
-      /* Identification critery: Larger line formed at base identifies glass */
-      row_count = highest_row = 0;
-      for (i = FIMy*320; i >= INIy*320 ; i--) {
-        if (i%320 == 0) {
-          if (row_count > highest_row) {
-            highest_row = row_count;
-          }
-          Serial.println(row_count);
-          row_count = 0;
-        }
-        if (img[i] < threshold) {
-          row_count++;
-        }
-      }
-      if (highest_row > 50) { /* if the line formed is greater than 50 identifies as glass */
-        cv++;
-      } else if (highest_row>5) {
-        cp++;
-      } else {
-        cn++;
-      }
-      drawScoreboard(cv, cp, cn);
+    /* Passes through the image pixels and reads the RGB */
+    for (i=76799; i >= 0 ; i--) {
+        r = imgFile.read();
+        g = imgFile.read();
+        b = imgFile.read();
+        x = ((r >> 3 ) << 11) | ((g >> 2 ) << 5) | (b >> 3 ); /* RGB 565 format */
+        img[i] = ((r >> 5 ) << 5) | ((g >> 5 ) << 2) | (b >> 6 );
+        GLCD.setColor(x); 
+        GLCD.drawPixel(i%320, i/320);
     }
+
+    /* Window to shrink analysis region */
+    for (i = FIMy*320; i >= INIy*320; i--) {
+        GLCD.setColor(((img[i] >> 3 ) << 11) | ((img[i] >> 2 ) << 5) | (img[i] >> 3 )); /* threshold/grayscale */
+        GLCD.drawPixel(i%320, i/320);
+    }
+
+    /* Print the border indicating analysis region */
+    GLCD.setColor(255, 255, 0);
+    GLCD.drawRoundRect(20, 140, 300, 220);
+
+    /* Identification critery: Larger line formed at base identifies glass */
+    row_count = highest_row = 0;
+    for (i = FIMy*320; i >= INIy*320 ; i--) {
+      if (i%320 == 0) {
+        if (row_count > highest_row) {
+          highest_row = row_count;
+        }
+        Serial.println(row_count);
+        row_count = 0;
+      }
+      if (img[i] < threshold) {
+        row_count++;
+      }
+    }
+    if (highest_row > 50) { /* if the line formed is greater than 50 identifies as glass */
+      cv++;
+    } else if (highest_row>5) {
+      cp++;
+    } else {
+      cn++;
+    }
+    drawScoreboard(cv, cp, cn);
 
     imgFile.close();
   } else {
